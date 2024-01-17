@@ -124,3 +124,66 @@ showSwordUpDown:
 	STA $0203, x
 
 	RTS 			; < UpdateSprites
+
+
+DrawBG:
+	LDA $2002             ; read PPU status to reset the high/low latch
+
+	LDA gamestate
+	CMP #STATETITLE
+	BEQ DrawBGTitle    ;;game is displaying title screen
+	LDA #$20
+	STA $2006             ; write the high byte of $2000 address
+	LDA #$43
+	STA $2006             ; write the low byte of $2000 address
+	LDX #$00              ; start out at 0
+
+	LDA #$4C
+	STA $2007
+	LDA #$69
+	STA $2007
+	LDA #$66
+	STA $2007
+	LDA #$65
+	STA $2007
+	LDA #$00
+	STA $2007
+	LDA life
+	LSR A
+	LSR A
+	LSR A
+	LSR A
+	CLC
+	ADC #$30
+	STA $2007             ; write to PPU
+
+	LDA life
+	AND #%00001111
+	ADC #$30
+	STA $2007             ; write to PPU
+
+DrawBGTitle:
+	LDA #$21
+	STA $2006             ; write the high byte of $2000 address
+	LDA #$43
+	STA $2006             ; write the low byte
+BGTitleLoop:
+	LDA gamestate
+	CMP #STATETITLE
+	BEQ BGTitleLoadAscii   ;;game is displaying title s
+	LDA #0
+BGTitlePrint:
+	STA $2007
+	INX
+	CPX #14
+	BNE BGTitleLoop
+
+	JMP	DrawBGDone
+BGTitleLoadAscii:
+	LDA title, x
+	JMP BGTitlePrint
+
+DrawBGDone:
+	;;draw score on screen using background tiles
+	;;or using many sprites
+  RTS

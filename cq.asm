@@ -27,6 +27,7 @@ swordFlip .rs 1
 buttons1   .rs 1  ; player 1 gamepad buttons, one bit per button
 buttons2   .rs 1  ; player 2 gamepad buttons, one bit per button
 
+beginBigWallPrint	.rs 1
 
 ;; DECLARE SOME CONSTANTS HERE
 STATETITLE     = $00  ; displaying title screen
@@ -34,8 +35,8 @@ STATEPLAYING   = $01  ; move paddles/ball, check for collisions
 STATEGAMEOVER  = $02  ; displaying game over screen
   
 RIGHTWALL      = $F4  ; when ball reaches one of these, do something
-TOPWALL        = $20
-BOTTOMWALL     = $E0
+TOPWALL        = $60
+BOTTOMWALL     = $80
 LEFTWALL       = $04
   
 
@@ -111,7 +112,42 @@ LoadBackground:
 	LDX #$00              ; start out at 0
 	LDY #0
 LoadBackgroundLoop:
+
+	CPY #4
+	BNE CheckBgUpWall
+	CPX #BOTTOMWALL
+	BNE BgBlank
+
+	LDA #BOTTOMWALL
+	JMP BgWallLoopIn
+
+CheckBgUpWall:
+	CPY #0
+	BNE BgBlank
+	CPX #TOPWALL
+	BNE BgBlank
+	LDA #TOPWALL
+BgWallLoopIn:
+	CLC
+	ADC #$20
+	STA beginBigWallPrint
+BgWallLoop:
+	LDA #$7E
+	STA $2007             ; write to PPU
+	INX
+	CPX beginBigWallPrint
+	BNE BgWallLoop
+
+BgBlank:
+	TXA
+	AND #$1f
+	BNE BgEmpty
+	LDA #$7E
+	JMP BgPushTile
+BgEmpty:
 	LDA #$0     ; load data from address (background + the value in x)
+
+BgPushTile:
 	STA $2007             ; write to PPU
 	INX                   ; X = X + 1
 	CPX #$c0              ; Compare X to hex $80, decimal 128 - copying 128 bytes
@@ -120,15 +156,14 @@ LoadBackgroundLoop:
 	LDX #0
 NoIncrY:
 	CPY #5
-  BNE LoadBackgroundLoop  ; Branch to LoadBackgroundLoop if compare was Not Equal to zero
+	BNE LoadBackgroundLoop  ; Branch to LoadBackgroundLoop if compare was Not Equal to zero
                         ; if compare was equal to 128, keep going down
 
 
-;;;Set some initial ball stats
-	LDA #$03
-	STA life
 
 	;; initialize PC
+	LDA #$03
+	STA life
 	LDA #$45
 	STA pcy
 	LDA #$45
@@ -143,7 +178,6 @@ NoIncrY:
   STA gamestate
 
 
-              
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
   STA $2000
 
@@ -152,8 +186,6 @@ NoIncrY:
 
 Forever:
   JMP Forever     ;jump back to Forever, infinite loop, waiting for NMI
-  
- 
 
 NMI:
   LDA #$00
@@ -161,7 +193,7 @@ NMI:
   LDA #$02
   STA $4014       ; set the high byte (02) of the RAM address, start the transfer
 
-  JSR DrawPlayerInfo
+  JSR DrawBG
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
@@ -176,7 +208,6 @@ NMI:
 
 
   JSR ReadController1  ;;get the current button data for player 1
-  JSR ReadController2  ;;get the current button data for player 2
   
 GameEngine:  
   LDA gamestate
@@ -192,7 +223,6 @@ GameEngine:
   BEQ EnginePlaying   ;;game is playing
 GameEngineDone:  
   
-	JSR UpdateSprites  ;;set ball/paddle sprites from positions
 
   RTI             ; return from interrupt
  
@@ -207,7 +237,14 @@ EngineTitle:
   ;;  load game screen
   ;;  set starting paddle/ball position
   ;;  go to Playing State
-  ;;  turn screen on
+	;;  turn screen on
+  	CLC
+	LDA buttons1
+	AND #%00100000
+	BEQ GameEngineDone
+	LDA #STATEPLAYING
+	STA gamestate
+
   JMP GameEngineDone
 
 ;;;;;;;;; 
@@ -237,8 +274,7 @@ MovePCUp:
 	CLC
 	SBC #1
 	STA pcy
-	LDA pcy
-	CMP #TOPWALL
+	CMP #$20
 	BCS MovePCUpDone
 	LDA pcy
 	CLC
@@ -257,6 +293,12 @@ MovePCUpDone:
 	LDA pcx
 	SBC #1
 	STA pcx
+	CMP #$08
+	BCS MovePcLeftDone
+	LDA pcx
+	CLC
+	ADC #2
+	STA pcx
 MovePcLeftDone:
 
 	CLC
@@ -267,6 +309,13 @@ MovePcLeftDone:
 	LDA pcx
 	ADC #2
 	STA pcx
+	CMP #$E8
+	BCC MovePcRightDone
+	LDA pcx
+	CLC
+	SBC #1
+	STA pcx
+
 MovePcRightDone:
 
 MovePCDown:
@@ -280,9 +329,8 @@ MovePCDown:
 	LDA pcy
 	ADC #2
 	STA pcy
-	LDA pcy
 	ADC #PADDLELEN_PIX
-	CMP #BOTTOMWALL
+	CMP #$E8
 	BCC MovePCDownDone
 	LDA pcy
 	CLC
@@ -293,46 +341,10 @@ MovePCDown:
   ;;    move paddle top and bottom down
 MovePCDownDone:
 
+	JSR UpdateSprites  ; print sprite
 
   JMP GameEngineDone
 
-
-DrawPlayerInfo:
-
-	LDA $2002             ; read PPU status to reset the high/low latch
-	LDA #$20
-	STA $2006             ; write the high byte of $2000 address
-	LDA #$43
-	STA $2006             ; write the low byte of $2000 address
-	LDX #$00              ; start out at 0
-
-	LDA #$4C
-	STA $2007
-	LDA #$69
-	STA $2007
-	LDA #$66
-	STA $2007
-	LDA #$65
-	STA $2007
-	LDA #$00
-	STA $2007
-	LDA life
-	LSR A
-	LSR A
-	LSR A
-	LSR A
-	CLC
-	ADC #$30
-	STA $2007             ; write to PPU
-
-	LDA life
-	AND #%00001111
-	ADC #$30
-	STA $2007             ; write to PPU
-
-	;;draw score on screen using background tiles
-	;;or using many sprites
-  RTS
   
 ReadController1:
   LDA #$01
@@ -347,23 +359,7 @@ ReadController1Loop:
   DEX
   BNE ReadController1Loop
   RTS
-  
-ReadController2:
-  LDA #$01
-  STA $4016
-  LDA #$00
-  STA $4016
-  LDX #$08
-ReadController2Loop:
-  LDA $4017
-  LSR A            ; bit0 -> Carry
-  ROL buttons2     ; bit0 <- Carry
-  DEX
-  BNE ReadController2Loop
-  RTS  
-  
-  
-    
+
 	.INCLUDE "cq-print.asm"
 
 ;;;;;;;;;;;;;;  
@@ -406,6 +402,8 @@ pc_sprite_attribute:
 sword_sprite_pos:
 	.db $65, $65, $75, $75
 
+title:
+	.db "CLEM QUEST !!!"
 
   .org $FFFA     ;first of the three vectors starts here
   .dw NMI        ;when an NMI happens (once per frame if enabled) the 
