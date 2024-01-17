@@ -141,9 +141,15 @@ BgWallLoop:
 BgBlank:
 	TXA
 	AND #$1f
-	BNE BgEmpty
+	BNE BgIsRightWall
 	LDA #$7E
 	JMP BgPushTile
+
+BgIsRightWall:
+	AND #$f0
+	LDA #$7E
+	JMP BgPushTile
+
 BgEmpty:
 	LDA #$0     ; load data from address (background + the value in x)
 
