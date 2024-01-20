@@ -2,23 +2,29 @@
   .ineschr 1   ; 1x  8KB CHR data
   .inesmap 0   ; mapper 0 = NROM, no bank swapping
   .inesmir 1   ; background mirroring
-  
 
 ;;;;;;;;;;;;;;;
 
 ;; DECLARE SOME VARIABLES HERE
   .rsset $0000  ;;start variables at ram location 0
-  
+
 gamestate  .rs 1  ; .rs 1 means reserve one byte of space
 
 pcy   .rs 1  ; player 1 paddle top vertical position
 paddletop   .rs 1  ; player 2 paddle bottom vertical position
 paddlex	    .rs 1
 paddleFrstSp .rs 1
+
+sprite_pos	.rs 1
+sprite_pos_hi	.rs 1
+
+sprite_round .rs 1
+
 SWORD_FRST_SP = $10
 paddlebot   .rs 1
 pcx         .rs 1  ; horizontal position for PC
 life     .rs 1  ; player 1 score, 0-15
+score	.rs 1
 
 swordDown .rs 1
 swordDown2 .rs 1
@@ -29,16 +35,31 @@ buttons2   .rs 1  ; player 2 gamepad buttons, one bit per button
 
 beginBigWallPrint	.rs 1
 
+;;; enemies
+enemy0_dead .rs 1
+enemy0_x .rs 1
+enemy0_y .rs 1
+enemy1_dead .rs 1
+enemy1_x .rs 1
+enemy1_y .rs 1
+enemy2_dead .rs 1
+enemy2_x .rs 1
+enemy2_y .rs 1
+
+cur_enemy_x .rs 1
+cur_enemy_y .rs 1
+cur_enemy_dead .rs 1
+
 ;; DECLARE SOME CONSTANTS HERE
 STATETITLE     = $00  ; displaying title screen
 STATEPLAYING   = $01  ; move paddles/ball, check for collisions
 STATEGAMEOVER  = $02  ; displaying game over screen
-  
+
 RIGHTWALL      = $F4  ; when ball reaches one of these, do something
 TOPWALL        = $60
 BOTTOMWALL     = $80
 LEFTWALL       = $04
-  
+
 
 PADDLELEN	= $4
 PADDLELEN_PIX	= 3 * 8
@@ -47,7 +68,7 @@ PADDLELEN_PIX	= 3 * 8
 
 
   .bank 0
-  .org $C000 
+  .org $C000
 RESET:
   SEI          ; disable IRQs
   CLD          ; disable decimal mode
@@ -77,7 +98,7 @@ clrmem:
   STA $0200, x
   INX
   BNE clrmem
-   
+
 vblankwait2:      ; Second wait for vblank, PPU is ready after this
   BIT $2002
   BPL vblankwait2
@@ -146,7 +167,21 @@ BgBlank:
 	JMP BgPushTile
 
 BgIsRightWall:
-	AND #$f0
+	TXA
+	CMP #$1f
+	BEQ BgRightWallLoad
+	CMP #$3f
+	BEQ BgRightWallLoad
+	CMP #$5f
+	BEQ BgRightWallLoad
+	CMP #$7f
+	BEQ BgRightWallLoad
+	CMP #$9f
+	BEQ BgRightWallLoad
+	CMP #$bf
+	BEQ BgRightWallLoad
+	JMP BgEmpty
+BgRightWallLoad:
 	LDA #$7E
 	JMP BgPushTile
 
@@ -165,8 +200,6 @@ NoIncrY:
 	BNE LoadBackgroundLoop  ; Branch to LoadBackgroundLoop if compare was Not Equal to zero
                         ; if compare was equal to 128, keep going down
 
-
-
 	;; initialize PC
 	LDA #$03
 	STA life
@@ -174,6 +207,21 @@ NoIncrY:
 	STA pcy
 	LDA #$45
 	STA pcx
+
+	LDA #0
+	;; init score
+	STA score
+	;; init enemies
+	STA enemy0_dead
+	LDA #50
+	STA enemy0_x
+	STA enemy0_y
+
+	LDA #0
+	STA enemy1_dead
+	LDA #$B0
+	STA enemy1_x
+	STA enemy1_y
 
 	;; init sword
 	JSR swordGoDown
@@ -299,7 +347,7 @@ MovePCUpDone:
 	LDA pcx
 	SBC #1
 	STA pcx
-	CMP #$08
+	CMP #$06
 	BCS MovePcLeftDone
 	LDA pcx
 	CLC
@@ -315,7 +363,7 @@ MovePcLeftDone:
 	LDA pcx
 	ADC #2
 	STA pcx
-	CMP #$E8
+	CMP #$Ea
 	BCC MovePcRightDone
 	LDA pcx
 	CLC
@@ -347,11 +395,46 @@ MovePCDown:
   ;;    move paddle top and bottom down
 MovePCDownDone:
 
+SwordUpColision:
+	LDA swordDown
+	CMP #0
+	BNE SwordDownColision
+	;; pcx > enemy_x and pcx < enemy_x + 16
+	LDA pcx
+	CLC
+	ADC #8
+	SEC
+	CMP enemy0_x
+	BCC SwordDownColision
+	SEC
+	SBC #16
+	CMP enemy0_x
+	BCS SwordDownColision
+	LDA pcy
+	SEC
+	SBC #16
+	CMP enemy0_y
+	BCC SwordDownColision
+	SEC
+	SBC #16
+	CMP enemy0_y
+	BCS SwordDownColision
+
+	LDA #0
+	STA enemy0_dead
+	LDA #$f1
+	STA enemy0_y
+	LDA score
+	CLC
+	ADC #1
+	STA score
+
+SwordDownColision:
+
 	JSR UpdateSprites  ; print sprite
 
   JMP GameEngineDone
 
-  
 ReadController1:
   LDA #$01
   STA $4016
@@ -398,6 +481,9 @@ incrx:
 	.db 0, 8, 0, 8
 incry:
 	.db 0,0,8,8
+
+en_sprite_pos:
+	.db $22, $22, $32, $32
 
 pc_sprite_pos:
 	.db $95, $95, $A5, $A5

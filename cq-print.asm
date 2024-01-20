@@ -15,39 +15,100 @@ swordGoUp:
 	STA swordFlip
 	RTS
 
+tryShowEnemy:
+	LDA cur_enemy_dead
+	CMP #0
+	BNE tryShowEnemyDead
+	LDA cur_enemy_y
+	STA paddletop
+	LDA cur_enemy_x
+	STA paddlex
+	LDA #$20 * 4
+	CLC
+	ADC sprite_round
+	STA paddleFrstSp
+	LDA #LOW(en_sprite_pos)
+	STA sprite_pos
+	LDA #HIGH(en_sprite_pos)
+	STA sprite_pos_hi
+	JSR PaddleSp  ;;set ball/paddle sprites from po
+	CLC
+	JMP tryShowEnemyOut
+
+tryShowEnemyDead:
+	LDA #$20 * 4
+	CLC
+	ADC sprite_round
+	TAX
+	LDA #$f1
+	STA $200, x
+	STA $210, x
+	STA $220, x
+	STA $230, x
+
+tryShowEnemyOut:
+	LDA sprite_round
+	ADC #$10
+	STA sprite_round
+	RTS
+
 PaddleSp:
 	;;update paddle sprites
-	LDX #4 			; paddle 4 sp len
+	LDY #4			; paddle 4 sp len
 ShowPaddle:
 	CLC
-	DEX
-	LDA paddleSpPos, x	; sprite pos
+	DEY
+	LDA paddleSpPos, y	; sprite pos
 	ADC paddleFrstSp 	; sprite threshold for player 1/2
-	TAY			; set y
+	TAX			; set y
 	LDA paddletop
 	CLC
-	ADC incry, x
-	STA $200, y
-	LDA pc_sprite_pos, x
-	STA $0201, y
-	LDA pc_sprite_attribute, x
-	STA $0202, y
+	ADC incry, y
+	STA $200, x
+	LDA sprite_pos
+	LDA sprite_pos_hi
+	LDA [sprite_pos],y
+	STA $0201, x
+	LDA pc_sprite_attribute, y
+	STA $0202, x
 	LDA paddlex
-	ADC incrx, x
-	STA $0203, y
-	CPX #0
+	ADC incrx, y
+	STA $0203, x
+	CPY #0
 	BNE ShowPaddle
 	RTS
 
 UpdateSprites:
-
 	LDA pcy
 	STA paddletop
 	LDA pcx
 	STA paddlex
 	LDA #0
 	STA paddleFrstSp
+	LDA #LOW(pc_sprite_pos)
+	STA sprite_pos
+	LDA #HIGH(pc_sprite_pos)
+	STA sprite_pos_hi
 	JSR PaddleSp  ;;set ball/paddle sprites from positions
+	LDA #0
+	STA sprite_round
+
+	LDA enemy0_dead
+	STA cur_enemy_dead
+	LDA enemy0_x
+	STA cur_enemy_x
+	LDA enemy0_y
+	STA cur_enemy_y
+	JSR tryShowEnemy
+
+	LDA enemy1_dead
+	STA cur_enemy_dead
+	LDA enemy1_x
+	STA cur_enemy_x
+	LDA enemy1_y
+	STA cur_enemy_y
+	JSR tryShowEnemy
+
 showSwordUpDown:
 	;; sword is aboce pc, carry setLDA pcy
 	LDX #SWORD_FRST_SP
@@ -59,7 +120,7 @@ showSwordUpDown:
 	STA $200, x
 	LDA #$65
 	STA $0201, x
-	LDA #$00
+	LDA #$02
 	ADC swordFlip
 	STA $0202, x
 	LDA pcx
@@ -77,7 +138,7 @@ showSwordUpDown:
 	STA $200, x
 	LDA #$65
 	STA $0201, x
-	LDA #$40
+	LDA #$42
 	ADC swordFlip
 	STA $0202, x
 	LDA pcx
@@ -97,7 +158,7 @@ showSwordUpDown:
 	STA $200, x
 	LDA #$75
 	STA $0201, x
-	LDA #$00
+	LDA #$02
 	ADC swordFlip
 	STA $0202, x
 	LDA pcx
@@ -115,7 +176,7 @@ showSwordUpDown:
 	STA $200, x
 	LDA #$75
 	STA $0201, x
-	LDA #$40
+	LDA #$42
 	ADC swordFlip
 	STA $0202, x
 	LDA pcx
@@ -148,7 +209,32 @@ DrawBG:
 	STA $2007
 	LDA #$00
 	STA $2007
+
 	LDA life
+	AND #%00001111
+	CLC
+	ADC #$30
+	STA $2007             ; write to PPU
+
+	LDA #$20
+
+	STA $2006             ; write the high byte of $2000 address
+	LDA #$54
+	STA $2006             ; write the low byte of $
+	LDA #$53	      ; 'S'
+	STA $2007
+	LDA #$63	      ; 'c'
+	STA $2007
+	LDA #$6f	      ; 'o'
+	STA $2007
+	LDA #$72		; 'r'
+	STA $2007
+	LDA #$65		; 'e'
+	STA $2007
+	LDA #$00		; SPACEEEE
+	STA $2007
+
+	LDA score
 	LSR A
 	LSR A
 	LSR A
@@ -157,10 +243,11 @@ DrawBG:
 	ADC #$30
 	STA $2007             ; write to PPU
 
-	LDA life
+	LDA score
 	AND #%00001111
 	ADC #$30
 	STA $2007             ; write to PPU
+
 
 DrawBGTitle:
 	LDA #$21
@@ -179,6 +266,7 @@ BGTitlePrint:
 	BNE BGTitleLoop
 
 	JMP	DrawBGDone
+
 BGTitleLoadAscii:
 	LDA title, x
 	JMP BGTitlePrint
