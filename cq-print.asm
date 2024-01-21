@@ -248,7 +248,6 @@ DrawBG:
 	ADC #$30
 	STA $2007             ; write to PPU
 
-
 DrawBGTitle:
 	LDA #$21
 	STA $2006             ; write the high byte of $2000 address
@@ -258,6 +257,9 @@ BGTitleLoop:
 	LDA gamestate
 	CMP #STATETITLE
 	BEQ BGTitleLoadAscii   ;;game is displaying title s
+	LDA gamestate
+	CMP #STATEGAMEOVER
+	BEQ BGLoseLoadAscii   ;;game is displaying title s
 	LDA #0
 BGTitlePrint:
 	STA $2007
@@ -266,6 +268,10 @@ BGTitlePrint:
 	BNE BGTitleLoop
 
 	JMP	DrawBGDone
+
+BGLoseLoadAscii:
+	LDA you_lose, x
+	JMP BGTitlePrint
 
 BGTitleLoadAscii:
 	LDA title, x

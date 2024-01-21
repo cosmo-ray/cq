@@ -50,6 +50,7 @@ cur_enemy_x .rs 1
 cur_enemy_y .rs 1
 cur_enemy_dead .rs 1
 
+seed .rs 1
 ;; DECLARE SOME CONSTANTS HERE
 STATETITLE     = $00  ; displaying title screen
 STATEPLAYING   = $01  ; move paddles/ball, check for collisions
@@ -200,31 +201,7 @@ NoIncrY:
 	BNE LoadBackgroundLoop  ; Branch to LoadBackgroundLoop if compare was Not Equal to zero
                         ; if compare was equal to 128, keep going down
 
-	;; initialize PC
-	LDA #$03
-	STA life
-	LDA #$45
-	STA pcy
-	LDA #$45
-	STA pcx
-
-	LDA #0
-	;; init score
-	STA score
-	;; init enemies
-	STA enemy0_dead
-	LDA #50
-	STA enemy0_x
-	STA enemy0_y
-
-	LDA #0
-	STA enemy1_dead
-	LDA #$B0
-	STA enemy1_x
-	STA enemy1_y
-
-	;; init sword
-	JSR swordGoDown
+	JSR initGame
 
 
 ;;:Set starting game state
@@ -298,6 +275,7 @@ EngineTitle:
 	BEQ GameEngineDone
 	LDA #STATEPLAYING
 	STA gamestate
+	JSR initGame
 
   JMP GameEngineDone
 
@@ -309,13 +287,26 @@ EngineGameOver:
   ;;  load title screen
   ;;  go to Title State
   ;;  turn screen on 
+  	CLC
+	LDA buttons1
+	AND #%00010000
+	BEQ GameEngineDone
+	LDA #STATETITLE
+	STA gamestate
   JMP GameEngineDone
  
 ;;;;;;;;;;;
  
 EnginePlaying:
 
+	LDA life
+	CMP #1
+	BNE NotDead
+	LDA #STATEGAMEOVER
+	STA gamestate
+	JMP GameEngineDone
 
+NotDead:
 MovePCUp:
 	CLC
 	LDA buttons1
@@ -427,6 +418,40 @@ ReadController1Loop:
   BNE ReadController1Loop
   RTS
 
+initGame:
+
+	;; init seed
+	LDA #24
+	ADC buttons1
+	STA seed
+	;; initialize PC
+	LDA #$03
+	STA life
+	LDA #$45
+	STA pcy
+	LDA #$45
+	STA pcx
+
+	LDA #0
+	;b; init score
+	STA score
+	;; init enemies
+	STA enemy0_dead
+	LDA #50
+	STA enemy0_x
+	STA enemy0_y
+
+	LDA #0
+	STA enemy1_dead
+	LDA #$B0
+	STA enemy1_x
+	STA enemy1_y
+
+	;; init sword
+	JSR swordGoDown
+	RTS
+
+	.INCLUDE "misc.asm"
 	.INCLUDE "cq-print.asm"
 
 ;;;;;;;;;;;;;;  
@@ -474,6 +499,9 @@ sword_sprite_pos:
 
 title:
 	.db "CLEM QUEST !!!"
+
+you_lose:
+	.db "You Lose !!!"
 
   .org $FFFA     ;first of the three vectors starts here
   .dw NMI        ;when an NMI happens (once per frame if enabled) the 
