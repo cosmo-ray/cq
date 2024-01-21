@@ -395,45 +395,23 @@ MovePCDown:
   ;;    move paddle top and bottom down
 MovePCDownDone:
 
-SwordUpColision:
-	LDA swordDown
-	CMP #0
-	BNE SwordDownColision
-	;; pcx > enemy_x and pcx < enemy_x + 16
-	LDA pcx
-	CLC
-	ADC #8
-	SEC
-	CMP enemy0_x
-	BCC SwordDownColision
-	SEC
-	SBC #16
-	CMP enemy0_x
-	BCS SwordDownColision
-	LDA pcy
-	SEC
-	SBC #16
-	CMP enemy0_y
-	BCC SwordDownColision
-	SEC
-	SBC #16
-	CMP enemy0_y
-	BCS SwordDownColision
+	LDA #LOW(enemy0_x)
+	STA cur_enemy_x
+	LDA #HIGH(enemy0_x)
+	STA cur_enemy_y
+	JSR EnemyCol
 
-	LDA #0
-	STA enemy0_dead
-	LDA #$f1
-	STA enemy0_y
-	LDA score
-	CLC
-	ADC #1
-	STA score
-
-SwordDownColision:
+	LDA #LOW(enemy1_x)
+	STA cur_enemy_x
+	LDA #HIGH(enemy1_x)
+	STA cur_enemy_y
+	JSR EnemyCol
 
 	JSR UpdateSprites  ; print sprite
 
   JMP GameEngineDone
+
+	.INCLUDE "cq-col.asm"
 
 ReadController1:
   LDA #$01
