@@ -109,6 +109,14 @@ UpdateSprites:
 	STA cur_enemy_y
 	JSR tryShowEnemy
 
+	LDA enemy2_dead
+	STA cur_enemy_dead
+	LDA enemy2_x
+	STA cur_enemy_x
+	LDA enemy2_y
+	STA cur_enemy_y
+	JSR tryShowEnemy
+
 showSwordUpDown:
 	;; sword is aboce pc, carry setLDA pcy
 	LDX #SWORD_FRST_SP

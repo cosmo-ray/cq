@@ -46,11 +46,17 @@ enemy2_dead .rs 1
 enemy2_x .rs 1
 enemy2_y .rs 1
 
+tmp .rs 1
+
 cur_enemy_x .rs 1
 cur_enemy_y .rs 1
 cur_enemy_dead .rs 1
 
 seed .rs 1
+seed_hi .rs 1
+add_x .rs 1
+add_y .rs 1
+
 ;; DECLARE SOME CONSTANTS HERE
 STATETITLE     = $00  ; displaying title screen
 STATEPLAYING   = $01  ; move paddles/ball, check for collisions
@@ -300,13 +306,74 @@ EngineGameOver:
 EnginePlaying:
 
 	LDA life
-	CMP #1
+	CMP #0
 	BNE NotDead
 	LDA #STATEGAMEOVER
 	STA gamestate
 	JMP GameEngineDone
 
 NotDead:
+
+	LDA #LOW(enemy0_x)
+	STA cur_enemy_x
+	LDA #HIGH(enemy0_x)
+	STA cur_enemy_y
+	LDY #0
+	LDX #0
+
+MoveMonsterLoop:
+
+	STY tmp
+	JSR prng
+	LDY tmp
+
+	LDA seed
+	AND #$05
+	STA add_x
+	LDA seed
+	LSR A
+	LSR A
+	AND #$05
+	STA add_y
+
+	LDA seed
+	AND #%00010000
+	BEQ MonsetLeft
+	LDA [cur_enemy_x], y
+	CLC
+	ADC add_x
+	STA [cur_enemy_x], y
+	JMP MonsterIsUP
+MonsetLeft:
+	LDA [cur_enemy_x], y
+	SEC
+	SBC add_x
+	STA [cur_enemy_x], y
+
+MonsterIsUP:
+	CLC
+	INY			; enemyX_y
+	LDA seed
+	AND #%00100000
+	BEQ MonsetDown
+	LDA [cur_enemy_x], y
+	ADC add_y
+	STA [cur_enemy_x], y
+	JMP MonsterCheckLoop
+MonsetDown:
+	LDA [cur_enemy_x], y
+	SEC
+	SBC add_y
+	STA [cur_enemy_x], y
+
+MonsterCheckLoop:
+	CLC
+	INY 			; enemyX_dead
+	INY			; enemyX_x
+	INX
+	CPX #3
+	BNE MoveMonsterLoop
+
 MovePCUp:
 	CLC
 	LDA buttons1
@@ -398,6 +465,12 @@ MovePCDownDone:
 	STA cur_enemy_y
 	JSR EnemyCol
 
+	LDA #LOW(enemy2_x)
+	STA cur_enemy_x
+	LDA #HIGH(enemy2_x)
+	STA cur_enemy_y
+	JSR EnemyCol
+
 	JSR UpdateSprites  ; print sprite
 
   JMP GameEngineDone
@@ -446,6 +519,12 @@ initGame:
 	LDA #$B0
 	STA enemy1_x
 	STA enemy1_y
+
+	LDA #0
+	STA enemy2_dead
+	LDA #$A0
+	STA enemy2_x
+	STA enemy2_y
 
 	;; init sword
 	JSR swordGoDown
