@@ -37,14 +37,20 @@ beginBigWallPrint	.rs 1
 
 ;;; enemies
 enemy0_dead .rs 1
+enemy0_patern .rs 1
 enemy0_x .rs 1
 enemy0_y .rs 1
 enemy1_dead .rs 1
+enemy1_patern .rs 1
 enemy1_x .rs 1
 enemy1_y .rs 1
 enemy2_dead .rs 1
+enemy2_patern .rs 1
 enemy2_x .rs 1
 enemy2_y .rs 1
+
+move_mask_1 .rs 1
+move_mask_1_cnt .rs 1
 
 tmp .rs 1
 
@@ -54,6 +60,7 @@ cur_enemy_dead .rs 1
 
 seed .rs 1
 seed_hi .rs 1
+move_mask .rs 1
 add_x .rs 1
 add_y .rs 1
 
@@ -314,29 +321,29 @@ EnginePlaying:
 
 NotDead:
 
-	LDA #LOW(enemy0_x)
+	LDA #LOW(enemy0_patern)
 	STA cur_enemy_x
-	LDA #HIGH(enemy0_x)
+	LDA #HIGH(enemy0_patern)
 	STA cur_enemy_y
 	LDY #0
 	LDX #0
 
 MoveMonsterLoop:
 
-	STY tmp
-	JSR prng
-	LDY tmp
-
-	LDA seed
+	LDA [cur_enemy_x], y
+	INY			; enemyX_patern -> enemyX_x
+	JSR LoadMoveMask
+MonsterDoMv:
+	LDA move_mask
 	AND #$05
 	STA add_x
-	LDA seed
+	LDA move_mask
 	LSR A
 	LSR A
 	AND #$05
 	STA add_y
 
-	LDA seed
+	LDA move_mask
 	AND #%00010000
 	BEQ MonsetLeft
 	LDA [cur_enemy_x], y
@@ -353,7 +360,7 @@ MonsetLeft:
 MonsterIsUP:
 	CLC
 	INY			; enemyX_y
-	LDA seed
+	LDA move_mask
 	AND #%00100000
 	BEQ MonsetDown
 	LDA [cur_enemy_x], y
@@ -369,7 +376,7 @@ MonsetDown:
 MonsterCheckLoop:
 	CLC
 	INY 			; enemyX_dead
-	INY			; enemyX_x
+	INY			; enemyX_patern
 	INX
 	CPX #3
 	BNE MoveMonsterLoop
@@ -477,6 +484,39 @@ MovePCDownDone:
 
 	.INCLUDE "cq-col.asm"
 
+LoadMoveMask:
+	CMP #0
+	BEQ rnd_patern
+	LDA move_mask_1
+	STA move_mask
+	LDA move_mask_1_cnt
+	SEC
+	SBC #1
+	STA move_mask_1_cnt
+	CMP #0
+	BNE LoadMoveMaskOut
+	STY tmp
+	JSR prng
+	LDY tmp
+	LDA seed
+	STA move_mask_1
+	STA move_mask
+	LDA #20
+	STA move_mask_1_cnt
+
+	RTS
+
+rnd_patern:
+	STY tmp
+	JSR prng
+	LDY tmp
+
+	LDA seed
+	STA move_mask
+LoadMoveMaskOut:
+	RTS
+
+
 ReadController1:
   LDA #$01
   STA $4016
@@ -505,23 +545,30 @@ initGame:
 	LDA #$45
 	STA pcx
 
+	LDA #1
+	STA move_mask_1_cnt
 	LDA #0
+
 	;b; init score
 	STA score
 	;; init enemies
 	STA enemy0_dead
+	STA enemy1_dead
+	STA enemy2_dead
+	STA enemy0_patern
+	STA enemy1_patern
+
+	LDA #1
+	STA enemy2_patern
+
 	LDA #50
 	STA enemy0_x
 	STA enemy0_y
 
-	LDA #0
-	STA enemy1_dead
 	LDA #$B0
 	STA enemy1_x
 	STA enemy1_y
 
-	LDA #0
-	STA enemy2_dead
 	LDA #$A0
 	STA enemy2_x
 	STA enemy2_y
